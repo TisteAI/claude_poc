@@ -1,0 +1,135 @@
+name: IRVS Security Scan
+
+on:
+  push:
+    branches: [ main, master, develop, claude/** ]
+  pull_request:
+    branches: [ main, master, develop ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  security-scan:
+    name: Security Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+
+      - name: Set up Python
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c  # v5.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Verify IRVS installation
+        run: |
+          irvs --help
+
+      - name: Scan pipeline configurations
+        run: |
+          echo "Scanning GitHub Actions workflows..."
+          irvs verify-pipeline .github/workflows --format json --output pipeline-results.json
+        continue-on-error: true
+
+      - name: Analyze dependencies
+        run: |
+          echo "Analyzing supply chain..."
+          irvs full-scan . --format json --output full-scan-results.json
+        continue-on-error: true
+
+      - name: Generate SBOM
+        run: |
+          echo "Generating Software Bill of Materials..."
+          irvs generate-sbom . --format spdx-json --output irvs-sbom.spdx.json
+        continue-on-error: true
+
+      - name: Generate SARIF report
+        run: |
+          echo "Generating SARIF report for GitHub Security tab..."
+          irvs full-scan . --format sarif --output irvs-results.sarif
+        continue-on-error: true
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@1b1aada464948af03b950897e5eb522f92603cc2  # v3.24.9
+        if: always()
+        with:
+          sarif_file: irvs-results.sarif
+          category: irvs-security-scan
+        continue-on-error: true
+
+      - name: Upload scan results as artifacts
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3  # v4.3.1
+        if: always()
+        with:
+          name: irvs-scan-results
+          path: |
+            pipeline-results.json
+            full-scan-results.json
+            irvs-sbom.spdx.json
+            irvs-results.sarif
+          retention-days: 90
+
+      - name: Display results summary
+        if: always()
+        run: |
+          echo "=== IRVS Security Scan Summary ==="
+          if [ -f full-scan-results.json ]; then
+            echo "Full scan completed. Check artifacts for detailed results."
+            python3 -c "
+import json
+try:
+    with open('full-scan-results.json', 'r') as f:
+        results = json.load(f)
+        summary = results.get('summary', {})
+        print(f'Total findings: {summary.get(\"total_findings\", 0)}')
+        print(f'Status: {\"PASSED\" if results.get(\"passed\", False) else \"FAILED\"}')
+        severity_counts = summary.get('severity_counts', {})
+        for severity, count in severity_counts.items():
+            if count > 0:
+                print(f'  {severity.upper()}: {count}')
+except Exception as e:
+    print(f'Could not parse results: {e}')
+            "
+          fi
+
+  test-suite:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+
+      - name: Set up Python
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c  # v5.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=irvs --cov-report=html --cov-report=term
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3  # v4.3.1
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
