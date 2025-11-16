@@ -1,0 +1,194 @@
+# Default Security Policies for IRVS
+# These policies enforce security best practices for governmental software
+
+policies:
+  - id: no-critical-vulns
+    name: No Critical Vulnerabilities
+    description: No critical severity vulnerabilities are allowed in production
+    severity: critical
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-53
+      - FedRAMP
+      - FISMA
+    conditions:
+      - finding_category: vulnerability
+        finding_severity: critical
+    remediation: |
+      Fix all critical vulnerabilities before deployment.
+      Update affected packages or apply security patches immediately.
+
+  - id: no-high-vulns-production
+    name: No High Severity Vulnerabilities in Production
+    description: High severity vulnerabilities must be remediated before production deployment
+    severity: high
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-53
+      - FedRAMP
+    conditions:
+      - finding_category: vulnerability
+        finding_severity: high
+    remediation: Remediate high severity vulnerabilities or obtain risk acceptance
+
+  - id: require-package-signature
+    name: Package Cryptographic Signature Required
+    description: All packages must have valid cryptographic signatures
+    severity: high
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-161
+      - EO-14028
+    conditions:
+      - finding_category: package_integrity
+        finding_title: "*signature*"
+    remediation: |
+      Use only cryptographically signed packages from trusted sources.
+      Verify GPG/PGP signatures or Sigstore attestations.
+
+  - id: require-sbom
+    name: Software Bill of Materials Required
+    description: All software components must have an SBOM
+    severity: medium
+    enabled: true
+    compliance_frameworks:
+      - EO-14028
+      - NIST-800-161
+    conditions:
+      - finding_category: supply_chain
+        finding_title: "*SBOM*"
+    remediation: |
+      Generate SBOM using tools like Syft or request from vendor.
+      Ensure SBOM is in SPDX or CycloneDX format.
+
+  - id: no-hardcoded-secrets
+    name: No Hardcoded Secrets
+    description: No secrets, credentials, or API keys hardcoded in code or pipelines
+    severity: critical
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-53
+      - FedRAMP
+    conditions:
+      - finding_category: secrets
+    remediation: |
+      Remove all hardcoded secrets immediately.
+      Use secret management systems (HashiCorp Vault, AWS Secrets Manager, etc.).
+      Rotate any exposed credentials.
+
+  - id: min-slsa-level-2
+    name: Minimum SLSA Level 2 Required
+    description: All build artifacts must meet SLSA Level 2 or higher
+    severity: high
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-161
+      - EO-14028
+    conditions:
+      - finding_category: provenance
+        finding_title: "*SLSA Level*"
+    remediation: |
+      Implement build provenance generation.
+      Use trusted build platforms (GitHub Actions, GitLab CI, etc.).
+      Generate and verify SLSA attestations.
+
+  - id: pin-all-dependencies
+    name: Dependencies Must Be Pinned
+    description: All dependencies must be pinned to exact versions with checksums
+    severity: medium
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-161
+    conditions:
+      - finding_category: supply_chain
+        finding_title: "*Unpinned*"
+    remediation: |
+      Pin all dependencies to exact versions.
+      Use lock files (package-lock.json, Pipfile.lock, go.sum, etc.).
+      Include checksums/hashes where possible.
+
+  - id: no-blocked-packages
+    name: No Blocked Packages Allowed
+    description: Packages on the blocked list must not be used
+    severity: critical
+    enabled: true
+    compliance_frameworks:
+      - organizational-policy
+    conditions:
+      - finding_category: supply_chain
+        finding_title: "*Blocked Package*"
+    remediation: Remove blocked packages and find approved alternatives
+
+  - id: no-typosquatting
+    name: No Typosquatting Packages
+    description: Prevent use of packages that may be typosquatting legitimate packages
+    severity: critical
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-161
+    conditions:
+      - finding_category: supply_chain
+        finding_title: "*Typosquatting*"
+    remediation: |
+      Verify package name is correct.
+      Check package source and maintainer.
+      Use official package names only.
+
+  - id: github-actions-pinned-sha
+    name: GitHub Actions Pinned to SHA
+    description: All GitHub Actions must be pinned to specific commit SHAs
+    severity: high
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-53
+    conditions:
+      - finding_category: pipeline_security
+        finding_title: "*Not Pinned*"
+    remediation: |
+      Pin all GitHub Actions to commit SHAs instead of tags.
+      Example: uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+
+  - id: no-overly-permissive-workflows
+    name: No Overly Permissive Workflow Permissions
+    description: CI/CD workflows should follow least privilege principle
+    severity: high
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-53
+    conditions:
+      - finding_category: pipeline_security
+        finding_title: "*Permissive*"
+    remediation: |
+      Review and minimize workflow permissions.
+      Use job-level permissions instead of workflow-level.
+      Only grant necessary permissions.
+
+  - id: no-script-injection
+    name: Prevent Script Injection in Pipelines
+    description: Pipelines must not be vulnerable to script injection
+    severity: critical
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-53
+    conditions:
+      - finding_category: pipeline_security
+        finding_title: "*Script Injection*"
+    remediation: |
+      Sanitize all user inputs in pipeline scripts.
+      Use environment variables instead of direct interpolation.
+      Avoid using untrusted context values in run commands.
+
+  - id: verify-checksum
+    name: Package Checksum Verification Required
+    description: All packages must have verified checksums
+    severity: high
+    enabled: true
+    compliance_frameworks:
+      - NIST-800-161
+    conditions:
+      - finding_category: package_integrity
+        finding_title: "*Checksum*"
+    remediation: |
+      Verify package checksums against trusted sources.
+      Use SHA-256 or SHA-512 checksums.
+      Obtain checksums from official package repositories.
