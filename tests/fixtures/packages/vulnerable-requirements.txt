@@ -1,0 +1,23 @@
+# Test requirements file with various security issues
+
+# Unpinned versions - should trigger warnings
+requests>=2.0.0
+flask~=2.0
+
+# Old vulnerable version
+django==2.2.0  # Known vulnerabilities
+
+# Typosquatting attempt
+reqeusts==2.28.0
+
+# Properly pinned (good)
+pyyaml==6.0
+
+# Development dependency
+pytest>=7.0.0
+
+# Wildcard version (bad)
+setuptools
+
+# Malicious pattern example
+test-backdoor-poc==1.0.0

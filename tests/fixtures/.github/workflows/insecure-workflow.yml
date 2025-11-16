@@ -1,0 +1,26 @@
+name: Insecure Workflow Example
+
+on:
+  pull_request_target:  # Dangerous with checkout
+    branches: [ main ]
+
+permissions: write-all  # Too permissive
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3  # Not pinned to SHA
+
+      - name: Run tests
+        run: |
+          # Script injection vulnerability
+          echo "Testing PR from ${{ github.event.pull_request.title }}"
+
+      - name: Use third-party action
+        uses: random-org/some-action@main  # Not pinned
+
+      - name: Hardcoded secret
+        env:
+          API_KEY: "sk_live_abc123_this_is_a_secret_key"
+        run: echo "Deploying..."

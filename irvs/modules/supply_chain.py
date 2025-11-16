@@ -170,14 +170,24 @@ class SupplyChainAnalyzer:
         findings = []
 
         try:
+            # Import the real parser
+            from irvs.utils.parsers import DependencyParser
+
             if dep_file.name == 'package.json':
                 findings.extend(self._analyze_npm_dependencies(dep_file))
             elif dep_file.name == 'requirements.txt':
-                findings.extend(self._analyze_python_requirements(dep_file))
+                # Use real parser
+                dependencies = DependencyParser.parse_requirements_txt(dep_file)
+                findings.extend(self._analyze_dependencies(dependencies, dep_file))
             elif dep_file.name == 'go.mod':
-                findings.extend(self._analyze_go_mod(dep_file))
+                dependencies = DependencyParser.parse_go_mod(dep_file)
+                findings.extend(self._analyze_dependencies(dependencies, dep_file))
             elif dep_file.name == 'Cargo.toml':
-                findings.extend(self._analyze_cargo_toml(dep_file))
+                dependencies = DependencyParser.parse_cargo_toml(dep_file)
+                findings.extend(self._analyze_dependencies(dependencies, dep_file))
+            elif dep_file.name == 'Gemfile':
+                dependencies = DependencyParser.parse_gemfile(dep_file)
+                findings.extend(self._analyze_dependencies(dependencies, dep_file))
             # Add more parsers as needed
 
         except Exception as e:
@@ -189,6 +199,49 @@ class SupplyChainAnalyzer:
                 description=f"Failed to analyze {dep_file.name}: {str(e)}",
                 affected_component=str(dep_file)
             ))
+
+        return findings
+
+    def _analyze_dependencies(self, dependencies: List, dep_file: Path) -> List[Finding]:
+        """Analyze a list of parsed dependencies."""
+        findings = []
+
+        for dep in dependencies:
+            # Check for typosquatting
+            if self.config.check_typosquatting:
+                typo_finding = self._check_typosquatting(dep.name, dep.ecosystem, dep_file)
+                if typo_finding:
+                    findings.append(typo_finding)
+
+            # Check for malicious patterns
+            if self.config.detect_malicious_packages:
+                mal_finding = self._check_malicious_pattern(dep.name, dep_file)
+                if mal_finding:
+                    findings.append(mal_finding)
+
+            # Check version pinning
+            if dep.version_spec and dep.version_spec not in ['==', '']:
+                findings.append(Finding(
+                    severity=Severity.MEDIUM,
+                    category="supply_chain",
+                    title="Unpinned Dependency Version",
+                    description=f"Package '{dep.name}' uses flexible version specifier: {dep.version_spec}{dep.version or ''}",
+                    remediation=f"Pin '{dep.name}' to an exact version for reproducibility",
+                    affected_component=str(dep_file),
+                    metadata={"package": dep.name, "version_spec": dep.version_spec, "ecosystem": dep.ecosystem}
+                ))
+
+            # Check for blocked packages
+            if dep.name in self.config.blocked_packages:
+                findings.append(Finding(
+                    severity=Severity.CRITICAL,
+                    category="supply_chain",
+                    title="Blocked Package Detected",
+                    description=f"Package '{dep.name}' is in the blocked list",
+                    remediation="Remove this package and find an alternative",
+                    affected_component=str(dep_file),
+                    metadata={"package": dep.name, "ecosystem": dep.ecosystem}
+                ))
 
         return findings
 
