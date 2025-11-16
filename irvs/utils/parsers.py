@@ -284,32 +284,69 @@ class DependencyParser:
 
     @staticmethod
     def parse_pom_xml(file_path: Path) -> List[Dependency]:
-        """Parse Maven pom.xml file (simplified - would need proper XML parsing)."""
+        """Parse Maven pom.xml file using proper XML parsing."""
+        import xml.etree.ElementTree as ET
+
         dependencies = []
 
         try:
-            content = file_path.read_text()
+            tree = ET.parse(file_path)
+            root = tree.getroot()
 
-            # Very simple regex-based parsing (a real implementation would use XML parser)
-            # This is just for demonstration
-            dep_pattern = r'<dependency>.*?<groupId>(.*?)</groupId>.*?<artifactId>(.*?)</artifactId>.*?<version>(.*?)</version>.*?</dependency>'
+            # Maven uses namespaces, so we need to handle that
+            # Default namespace for Maven POM
+            namespace = {'mvn': 'http://maven.apache.org/POM/4.0.0'}
 
-            matches = re.finditer(dep_pattern, content, re.DOTALL)
+            # Try without namespace first (some POMs don't use it)
+            deps_elem = root.find('.//dependencies')
+            if deps_elem is None:
+                # Try with namespace
+                deps_elem = root.find('.//mvn:dependencies', namespace)
 
-            for match in matches:
-                group_id = match.group(1).strip()
-                artifact_id = match.group(2).strip()
-                version = match.group(3).strip()
+            if deps_elem is not None:
+                # Find all dependency elements
+                dep_elements = deps_elem.findall('.//dependency')
+                if not dep_elements:
+                    # Try with namespace
+                    dep_elements = deps_elem.findall('.//mvn:dependency', namespace)
 
-                # Maven uses groupId:artifactId as package name
-                name = f"{group_id}:{artifact_id}"
+                for dep in dep_elements:
+                    # Extract groupId, artifactId, version
+                    group_id = dep.find('groupId')
+                    if group_id is None:
+                        group_id = dep.find('mvn:groupId', namespace)
 
-                dependencies.append(Dependency(
-                    name=name,
-                    version=version,
-                    ecosystem="maven"
-                ))
+                    artifact_id = dep.find('artifactId')
+                    if artifact_id is None:
+                        artifact_id = dep.find('mvn:artifactId', namespace)
 
+                    version = dep.find('version')
+                    if version is None:
+                        version = dep.find('mvn:version', namespace)
+
+                    # Extract text values
+                    if group_id is not None and artifact_id is not None:
+                        group_text = group_id.text.strip() if group_id.text else ''
+                        artifact_text = artifact_id.text.strip() if artifact_id.text else ''
+                        version_text = version.text.strip() if version is not None and version.text else None
+
+                        # Skip if version is a property reference like ${some.version}
+                        if version_text and version_text.startswith('${'):
+                            version_text = None  # Can't resolve properties without full POM context
+
+                        # Maven uses groupId:artifactId as package name
+                        name = f"{group_text}:{artifact_text}"
+
+                        dependencies.append(Dependency(
+                            name=name,
+                            version=version_text,
+                            ecosystem="maven"
+                        ))
+
+            logger.debug(f"Parsed {len(dependencies)} dependencies from pom.xml")
+
+        except ET.ParseError as e:
+            logger.error(f"XML parse error in pom.xml: {e}")
         except Exception as e:
             logger.error(f"Error parsing pom.xml: {e}")
 

@@ -247,52 +247,17 @@ class SupplyChainAnalyzer:
 
     def _analyze_npm_dependencies(self, package_json: Path) -> List[Finding]:
         """Analyze npm package.json for security issues."""
+        from irvs.utils.parsers import DependencyParser
+
         findings = []
 
         try:
-            with open(package_json, 'r') as f:
-                data = json.load(f)
+            # Use the real parser
+            prod_deps, dev_deps = DependencyParser.parse_package_json(package_json)
+            all_deps = prod_deps + dev_deps
 
-            dependencies = {}
-            dependencies.update(data.get('dependencies', {}))
-            dependencies.update(data.get('devDependencies', {}))
-
-            for pkg_name, version in dependencies.items():
-                # Check for typosquatting
-                if self.config.check_typosquatting:
-                    typo_finding = self._check_typosquatting(pkg_name, 'npm', package_json)
-                    if typo_finding:
-                        findings.append(typo_finding)
-
-                # Check for malicious patterns
-                if self.config.detect_malicious_packages:
-                    mal_finding = self._check_malicious_pattern(pkg_name, package_json)
-                    if mal_finding:
-                        findings.append(mal_finding)
-
-                # Check version pinning
-                if version.startswith('^') or version.startswith('~') or version == '*':
-                    findings.append(Finding(
-                        severity=Severity.MEDIUM,
-                        category="supply_chain",
-                        title="Unpinned Dependency Version",
-                        description=f"Package '{pkg_name}' uses flexible version: {version}",
-                        remediation="Pin dependencies to exact versions for reproducibility",
-                        affected_component=str(package_json),
-                        metadata={"package": pkg_name, "version": version}
-                    ))
-
-                # Check for blocked packages
-                if pkg_name in self.config.blocked_packages:
-                    findings.append(Finding(
-                        severity=Severity.CRITICAL,
-                        category="supply_chain",
-                        title="Blocked Package Detected",
-                        description=f"Package '{pkg_name}' is in the blocked list",
-                        remediation="Remove this package and find an alternative",
-                        affected_component=str(package_json),
-                        metadata={"package": pkg_name}
-                    ))
+            # Use the common analysis method
+            findings.extend(self._analyze_dependencies(all_deps, package_json))
 
         except json.JSONDecodeError as e:
             findings.append(Finding(
@@ -304,6 +269,13 @@ class SupplyChainAnalyzer:
             ))
         except Exception as e:
             logger.error(f"Error analyzing npm dependencies: {e}")
+            findings.append(Finding(
+                severity=Severity.MEDIUM,
+                category="supply_chain",
+                title="npm Analysis Error",
+                description=f"Error analyzing npm dependencies: {str(e)}",
+                affected_component=str(package_json)
+            ))
 
         return findings
 

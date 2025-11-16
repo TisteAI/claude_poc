@@ -97,6 +97,8 @@ class SBOMHandler:
 
     def _generate_spdx(self, target_path: str) -> str:
         """Generate SPDX SBOM format."""
+        from irvs.utils.parsers import DependencyParser
+
         path = Path(target_path)
 
         spdx = {
@@ -110,10 +112,11 @@ class SBOMHandler:
                 "creators": ["Tool: IRVS-SBOM-Generator"],
                 "licenseListVersion": "3.20"
             },
-            "packages": []
+            "packages": [],
+            "relationships": []
         }
 
-        # Add basic package information
+        # Add main package information
         main_package = {
             "SPDXID": f"SPDXRef-Package-{path.name}",
             "name": path.name,
@@ -125,13 +128,121 @@ class SBOMHandler:
 
         spdx["packages"].append(main_package)
 
-        # TODO: Analyze actual dependencies from manifest files
-        # This would parse requirements.txt, package.json, etc.
+        # Parse actual dependencies from manifest files
+        dependencies_found = 0
+
+        # Check if target is a directory
+        if path.is_dir():
+            # Python dependencies
+            req_file = path / 'requirements.txt'
+            if req_file.exists():
+                try:
+                    deps = DependencyParser.parse_requirements_txt(req_file)
+                    for dep in deps:
+                        pkg_id = f"SPDXRef-Package-{dep.name}-{dep.version or 'unknown'}"
+                        spdx["packages"].append({
+                            "SPDXID": pkg_id,
+                            "name": dep.name,
+                            "versionInfo": dep.version or "NOASSERTION",
+                            "downloadLocation": "NOASSERTION",
+                            "filesAnalyzed": False,
+                            "supplier": "NOASSERTION"
+                        })
+                        # Add dependency relationship
+                        spdx["relationships"].append({
+                            "spdxElementId": f"SPDXRef-Package-{path.name}",
+                            "relationshipType": "DEPENDS_ON",
+                            "relatedSpdxElement": pkg_id
+                        })
+                        dependencies_found += 1
+                    logger.info(f"Added {len(deps)} Python dependencies from requirements.txt")
+                except Exception as e:
+                    logger.warning(f"Error parsing requirements.txt: {e}")
+
+            # Node.js dependencies
+            pkg_file = path / 'package.json'
+            if pkg_file.exists():
+                try:
+                    prod_deps, dev_deps = DependencyParser.parse_package_json(pkg_file)
+                    for dep in prod_deps + dev_deps:
+                        pkg_id = f"SPDXRef-Package-{dep.name}-{dep.version or 'unknown'}"
+                        spdx["packages"].append({
+                            "SPDXID": pkg_id,
+                            "name": dep.name,
+                            "versionInfo": dep.version or "NOASSERTION",
+                            "downloadLocation": "NOASSERTION",
+                            "filesAnalyzed": False,
+                            "supplier": "NOASSERTION"
+                        })
+                        spdx["relationships"].append({
+                            "spdxElementId": f"SPDXRef-Package-{path.name}",
+                            "relationshipType": "DEPENDS_ON" if not dep.is_dev else "DEV_DEPENDENCY_OF",
+                            "relatedSpdxElement": pkg_id
+                        })
+                        dependencies_found += 1
+                    logger.info(f"Added {len(prod_deps)} production and {len(dev_deps)} dev dependencies from package.json")
+                except Exception as e:
+                    logger.warning(f"Error parsing package.json: {e}")
+
+            # Go dependencies
+            go_mod = path / 'go.mod'
+            if go_mod.exists():
+                try:
+                    deps = DependencyParser.parse_go_mod(go_mod)
+                    for dep in deps:
+                        pkg_id = f"SPDXRef-Package-{dep.name.replace('/', '-')}-{dep.version or 'unknown'}"
+                        spdx["packages"].append({
+                            "SPDXID": pkg_id,
+                            "name": dep.name,
+                            "versionInfo": dep.version or "NOASSERTION",
+                            "downloadLocation": "NOASSERTION",
+                            "filesAnalyzed": False,
+                            "supplier": "NOASSERTION"
+                        })
+                        spdx["relationships"].append({
+                            "spdxElementId": f"SPDXRef-Package-{path.name}",
+                            "relationshipType": "DEPENDS_ON",
+                            "relatedSpdxElement": pkg_id
+                        })
+                        dependencies_found += 1
+                    logger.info(f"Added {len(deps)} Go dependencies from go.mod")
+                except Exception as e:
+                    logger.warning(f"Error parsing go.mod: {e}")
+
+            # Rust dependencies
+            cargo_toml = path / 'Cargo.toml'
+            if cargo_toml.exists():
+                try:
+                    deps = DependencyParser.parse_cargo_toml(cargo_toml)
+                    for dep in deps:
+                        pkg_id = f"SPDXRef-Package-{dep.name}-{dep.version or 'unknown'}"
+                        spdx["packages"].append({
+                            "SPDXID": pkg_id,
+                            "name": dep.name,
+                            "versionInfo": dep.version or "NOASSERTION",
+                            "downloadLocation": "NOASSERTION",
+                            "filesAnalyzed": False,
+                            "supplier": "NOASSERTION"
+                        })
+                        spdx["relationships"].append({
+                            "spdxElementId": f"SPDXRef-Package-{path.name}",
+                            "relationshipType": "DEPENDS_ON",
+                            "relatedSpdxElement": pkg_id
+                        })
+                        dependencies_found += 1
+                    logger.info(f"Added {len(deps)} Rust dependencies from Cargo.toml")
+                except Exception as e:
+                    logger.warning(f"Error parsing Cargo.toml: {e}")
+
+        if dependencies_found == 0:
+            logger.warning("No dependency files found or parsed. SBOM will only contain main package.")
 
         return json.dumps(spdx, indent=2)
 
     def _generate_cyclonedx(self, target_path: str) -> str:
         """Generate CycloneDX SBOM format."""
+        from irvs.utils.parsers import DependencyParser
+
         path = Path(target_path)
 
         cyclonedx = {
@@ -157,7 +268,80 @@ class SBOMHandler:
             "components": []
         }
 
-        # TODO: Analyze actual dependencies
+        # Parse actual dependencies from manifest files
+        dependencies_found = 0
+
+        if path.is_dir():
+            # Python dependencies
+            req_file = path / 'requirements.txt'
+            if req_file.exists():
+                try:
+                    deps = DependencyParser.parse_requirements_txt(req_file)
+                    for dep in deps:
+                        cyclonedx["components"].append({
+                            "type": "library",
+                            "name": dep.name,
+                            "version": dep.version or "unknown",
+                            "purl": f"pkg:pypi/{dep.name}@{dep.version}" if dep.version else f"pkg:pypi/{dep.name}"
+                        })
+                        dependencies_found += 1
+                    logger.info(f"Added {len(deps)} Python dependencies")
+                except Exception as e:
+                    logger.warning(f"Error parsing requirements.txt: {e}")
+
+            # Node.js dependencies
+            pkg_file = path / 'package.json'
+            if pkg_file.exists():
+                try:
+                    prod_deps, dev_deps = DependencyParser.parse_package_json(pkg_file)
+                    for dep in prod_deps + dev_deps:
+                        cyclonedx["components"].append({
+                            "type": "library",
+                            "name": dep.name,
+                            "version": dep.version or "unknown",
+                            "purl": f"pkg:npm/{dep.name}@{dep.version}" if dep.version else f"pkg:npm/{dep.name}"
+                        })
+                        dependencies_found += 1
+                    logger.info(f"Added {len(prod_deps + dev_deps)} npm dependencies")
+                except Exception as e:
+                    logger.warning(f"Error parsing package.json: {e}")
+
+            # Go dependencies
+            go_mod = path / 'go.mod'
+            if go_mod.exists():
+                try:
+                    deps = DependencyParser.parse_go_mod(go_mod)
+                    for dep in deps:
+                        cyclonedx["components"].append({
+                            "type": "library",
+                            "name": dep.name,
+                            "version": dep.version or "unknown",
+                            "purl": f"pkg:golang/{dep.name}@{dep.version}" if dep.version else f"pkg:golang/{dep.name}"
+                        })
+                        dependencies_found += 1
+                    logger.info(f"Added {len(deps)} Go dependencies")
+                except Exception as e:
+                    logger.warning(f"Error parsing go.mod: {e}")
+
+            # Rust dependencies
+            cargo_toml = path / 'Cargo.toml'
+            if cargo_toml.exists():
+                try:
+                    deps = DependencyParser.parse_cargo_toml(cargo_toml)
+                    for dep in deps:
+                        cyclonedx["components"].append({
+                            "type": "library",
+                            "name": dep.name,
+                            "version": dep.version or "unknown",
+                            "purl": f"pkg:cargo/{dep.name}@{dep.version}" if dep.version else f"pkg:cargo/{dep.name}"
+                        })
+                        dependencies_found += 1
+                    logger.info(f"Added {len(deps)} Rust dependencies")
+                except Exception as e:
+                    logger.warning(f"Error parsing Cargo.toml: {e}")
+
+        if dependencies_found == 0:
+            logger.warning("No dependency files found or parsed. SBOM will only contain main component.")
 
         return json.dumps(cyclonedx, indent=2)
 

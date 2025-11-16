@@ -13,6 +13,7 @@ from irvs.modules.vulnerability_scanner import VulnerabilityScanner
 from irvs.modules.provenance_verifier import ProvenanceVerifier
 from irvs.modules.policy_engine import PolicyEngine
 from irvs.modules.sbom_handler import SBOMHandler
+from irvs.modules import VulnerabilityScannerError
 
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,10 @@ class VerificationEngine:
                 result.findings.extend(policy_result.findings)
                 result.verification_types.append("policy_check")
 
+        except VulnerabilityScannerError as e:
+            # Re-raise critical scanner errors
+            logger.error(f"Vulnerability scanner error: {e}")
+            raise
         except Exception as e:
             logger.error(f"Error during package verification: {e}")
             result.add_finding(Finding(
