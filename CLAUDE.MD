@@ -2,19 +2,34 @@
 
 ## Project Overview
 
-**IRVS (Infrastructure Resilience Verification System)** is a production-ready security verification system designed for critical governmental software infrastructure. It's a comprehensive Python tool that detects and prevents supply chain security threats through package verification, CI/CD pipeline analysis, vulnerability scanning, and compliance enforcement.
+**IRVS (Infrastructure Resilience Verification System)** is a comprehensive security verification system under development for critical governmental software infrastructure. It's a Python tool designed to detect and prevent supply chain security threats through package verification, CI/CD pipeline analysis, vulnerability scanning, and compliance enforcement.
 
 **Version:** 0.1.0
-**Status:** Production Ready
+**Status:** ⚠️ Active Development - NOT Production Ready (45% Production Readiness)
 **License:** Apache 2.0
 **Python:** 3.8+
+
+> **⚠️ PRODUCTION READINESS NOTICE**
+>
+> While IRVS has functional core capabilities, it currently has **4 CRITICAL blockers**
+> preventing production deployment in governmental environments. Current production
+> readiness: **45%** (target: 90%+).
+>
+> **Critical Issues:**
+> - No cryptographic verification of provenance attestations
+> - Test coverage only 9.2% (need 80%+ for critical infrastructure)
+> - No audit trail or persistence layer (violates NIST 800-53)
+> - Misleading NVD integration claims (cannot operate air-gapped)
+>
+> **See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for complete assessment and remediation roadmap.**
 
 ## Quick Stats
 
 - **Total Lines of Code:** ~4,550+ Python LOC
 - **Modules:** 7 security verification modules
 - **Policies:** 13 built-in security policies
-- **Test Coverage:** 12/12 tests passing
+- **Test Coverage:** ⚠️ 9.2% (403 test lines / 4,366 code lines) - 12/12 tests passing but insufficient coverage
+- **Production Readiness:** 45% (4 critical blockers - see PRODUCTION_READINESS.md)
 - **Supported Ecosystems:** Python, npm, Go, Rust, Ruby, Maven
 
 ## Project Structure
@@ -108,14 +123,16 @@ python-dateutil>=2.8.0 # Date handling
 
 ### 4. Vulnerability Scanner (`vulnerability_scanner.py`)
 - Grype and Trivy integration
-- CVE database correlation (NVD, OSV, GitHub)
+- ⚠️ CVE database correlation via Grype/Trivy (indirect access to NVD, OSV, GitHub)
 - CVSS scoring
 - Configurable severity thresholds
+- **Note:** No direct NVD API integration - requires internet connectivity (see PRODUCTION_READINESS.md CRIT-002)
 
 ### 5. Provenance Verifier (`provenance_verifier.py`)
 - SLSA framework compliance (Levels 1-3)
-- Build attestation validation
+- Build attestation parsing
 - Trusted builder verification
+- ⚠️ **CRITICAL LIMITATION:** Does not cryptographically verify signatures - accepts fake attestations (see PRODUCTION_READINESS.md CRIT-001)
 
 ### 6. Policy Engine (`policy_engine.py`)
 - 13 built-in security policies
@@ -455,14 +472,62 @@ Security verification tool for governmental/critical infrastructure software sup
 4. **Extensibility:** Easy to add new modules and policies
 5. **Automation:** CI/CD integration for continuous verification
 
-### Important Constraints
-- Must support air-gapped environments
-- No internet dependencies for core functionality
-- Must produce auditable reports
-- Must support multiple compliance frameworks
+### Important Constraints (Target Requirements)
+- Must support air-gapped environments ⚠️ *Not yet achieved - see CRIT-002*
+- No internet dependencies for core functionality ⚠️ *Currently requires Grype/Trivy which need internet*
+- Must produce auditable reports ⚠️ *No persistence layer yet - see CRIT-004*
+- Must support multiple compliance frameworks ✅ *Partially implemented*
+
+**Note:** These are target requirements for production readiness, not current capabilities.
+
+## Known Limitations and Production Barriers
+
+### ⚠️ Critical Issues (Must Fix Before Production)
+
+Detailed in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md):
+
+**🔴 CRIT-001: No Cryptographic Verification of Provenance**
+- Provenance verifier parses attestations but doesn't cryptographically verify signatures
+- Attackers can provide fake SLSA attestations and IRVS will accept them
+- Status: Open | Impact: Critical | File: `irvs/modules/provenance_verifier.py:274-295`
+
+**🔴 CRIT-002: Misleading NVD Integration Claims**
+- No direct NVD API integration - only wraps Grype/Trivy
+- Cannot operate in air-gapped governmental environments
+- Documentation claims could void contracts
+- Status: Open | Impact: Critical
+
+**🔴 CRIT-003: Insufficient Test Coverage (9.2%)**
+- Industry standard for critical infrastructure: 80%+ coverage
+- Current: 403 test lines / 4,366 implementation lines
+- High risk of undiscovered bugs in production
+- Status: Open | Impact: Critical
+
+**🔴 CRIT-004: No Audit Trail or Persistence**
+- All verification results are ephemeral (lost after CLI exits)
+- Violates NIST 800-53 AU (Audit) family requirements
+- Cannot investigate past security incidents
+- Status: Open | Impact: Critical
+
+### 🟠 High Priority Issues
+
+- No caching or performance optimization (scans take 5+ minutes for 100 dependencies)
+- External tool hard dependencies (complex deployment)
+- No API or service mode (CLI only)
+- Limited error recovery (no retry logic)
+
+### Production Readiness Roadmap
+
+**Phase 1 (4-6 weeks):** Fix critical issues → 70% ready
+**Phase 2 (4-6 weeks):** Performance optimization → 85% ready
+**Phase 3 (4-6 weeks):** Service mode → 95% ready
+
+See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for complete roadmap.
 
 ## Additional Resources
 
+- **Production Readiness:** [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)
+- **Supply Chain Security:** [docs/SUPPLY_CHAIN_SECURITY.md](docs/SUPPLY_CHAIN_SECURITY.md)
 - **Issue Tracker:** GitHub Issues
 - **Documentation:** `/docs` directory
 - **Examples:** `/examples` directory
@@ -471,5 +536,5 @@ Security verification tool for governmental/critical infrastructure software sup
 ---
 
 **Last Updated:** 2025-11-16
-**Project Status:** Production Ready
-**Current Branch:** claude/create-claude-md-01PS5kj8WDyAT6RsZWamzepC
+**Project Status:** ⚠️ Active Development - 45% Production Ready (NOT ready for production use)
+**Current Branch:** claude/init-project-codebase-01MtVAU6Ui724UUdRxvCocbr
