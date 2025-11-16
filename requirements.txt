@@ -1,0 +1,28 @@
+# Core dependencies
+click>=8.1.0
+pyyaml>=6.0
+python-dateutil>=2.8.0
+
+# Optional external tool integrations
+# These tools can be installed separately for enhanced functionality
+
+# SBOM Generation
+# syft - Install separately: https://github.com/anchore/syft
+
+# Vulnerability Scanning
+# grype - Install separately: https://github.com/anchore/grype
+# trivy - Install separately: https://github.com/aquasecurity/trivy
+
+# Signature Verification
+# cosign - Install separately: https://github.com/sigstore/cosign
+# gpg - Usually pre-installed on most systems
+
+# Provenance Verification
+# in-toto - Install separately: https://github.com/in-toto/in-toto
+
+# Development dependencies (optional)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0

@@ -1,0 +1,70 @@
+# IRVS Strict Configuration
+# For high-security governmental deployments
+
+policy:
+  enabled: true
+  policy_dir: "policies"
+  fail_on_policy_violation: true
+  custom_policies: []
+
+package_verification:
+  verify_signatures: true
+  verify_checksums: true
+  allowed_signature_types:
+    - gpg
+    - cosign
+    - sigstore
+  trusted_keys: []
+  require_sbom: true
+  sbom_formats:
+    - spdx
+    - cyclonedx
+
+pipeline:
+  scan_workflows: true
+  detect_secrets: true
+  check_permissions: true
+  verify_action_pinning: true
+  allowed_actions:
+    - actions/checkout
+    - actions/setup-python
+    - actions/setup-node
+    - actions/upload-artifact
+    - actions/download-artifact
+  blocked_actions:
+    - "*"  # Deny all by default, only allowed_actions permitted
+
+vulnerability:
+  enabled: true
+  sources:
+    - nvd
+    - osv
+    - github
+  max_cvss_score: 7.0  # Fail on medium and above
+  fail_on_critical: true
+  fail_on_high: true
+  ignore_cves: []
+
+provenance:
+  enabled: true
+  require_slsa_level: 3  # Require SLSA Level 3
+  verify_build_environment: true
+  trusted_builders:
+    - "https://github.com/slsa-framework/slsa-github-generator"
+  in_toto_layout: null
+
+supply_chain:
+  analyze_dependencies: true
+  check_typosquatting: true
+  detect_malicious_packages: true
+  max_dependency_depth: 10
+  allowed_registries:
+    - "https://registry.npmjs.org"
+    - "https://pypi.org"
+    - "https://repo.maven.apache.org"
+  blocked_packages: []
+
+output_format: "json"
+log_level: "INFO"
+cache_dir: ".irvs_cache"
+report_dir: "reports"

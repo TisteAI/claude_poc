@@ -1,0 +1,70 @@
+# IRVS Default Configuration
+# Infrastructure Resilience Verification System
+
+# Policy Engine Configuration
+policy:
+  enabled: true
+  policy_dir: "policies"
+  fail_on_policy_violation: true
+  custom_policies: []
+
+# Package Verification Settings
+package_verification:
+  verify_signatures: true
+  verify_checksums: true
+  allowed_signature_types:
+    - gpg
+    - cosign
+    - sigstore
+  trusted_keys: []
+  require_sbom: true
+  sbom_formats:
+    - spdx
+    - cyclonedx
+
+# CI/CD Pipeline Security Scanner
+pipeline:
+  scan_workflows: true
+  detect_secrets: true
+  check_permissions: true
+  verify_action_pinning: true
+  allowed_actions:
+    - actions/*
+    - github/*
+  blocked_actions: []
+
+# Vulnerability Scanner Configuration
+vulnerability:
+  enabled: true
+  sources:
+    - nvd
+    - osv
+    - github
+  max_cvss_score: 10.0
+  fail_on_critical: true
+  fail_on_high: true
+  ignore_cves: []
+
+# Provenance Verification (SLSA Framework)
+provenance:
+  enabled: true
+  require_slsa_level: 2
+  verify_build_environment: true
+  trusted_builders:
+    - "https://github.com/slsa-framework/slsa-github-generator"
+  in_toto_layout: null
+
+# Supply Chain Analysis
+supply_chain:
+  analyze_dependencies: true
+  check_typosquatting: true
+  detect_malicious_packages: true
+  max_dependency_depth: 10
+  allowed_registries: []
+  blocked_packages: []
+
+# Output Configuration
+output_format: "json"
+log_level: "INFO"
+cache_dir: ".irvs_cache"
+report_dir: "reports"
